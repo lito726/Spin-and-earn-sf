@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spin & Earn SC Coin</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      text-align: center;
+      background: linear-gradient(to bottom, #121212, #1e1e1e);
+      color: white;
+    }
+    .screen { display: none; padding: 20px; }
+    .active { display: block; }
+    .button {
+      background-color: #28a745;
+      color: white;
+      padding: 15px 25px;
+      margin: 10px;
+      border: none;
+      font-size: 18px;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #wheel {
+      width: 250px;
+      height: 250px;
+      border-radius: 50%;
+      border: 10px solid #fff;
+      margin: 20px auto;
+      background: conic-gradient(
+        #f00 0% 25%,
+        #0f0 25% 50%,
+        #00f 50% 75%,
+        #ff0 75% 100%
+      );
+      position: relative;
+      transition: transform 4s ease-out;
+    }
+    #pointer {
+      width: 0;
+      height: 0;
+      border-left: 20px solid transparent;
+      border-right: 20px solid transparent;
+      border-bottom: 30px solid red;
+      margin: 0 auto;
+    }
+    .loot { background: #ffc107; color: black; }
+    #ad-banner {
+      background: #333;
+      color: white;
+      padding: 10px;
+      margin-top: 15px;
+    }
+    input[type="text"] {
+      padding: 10px;
+      font-size: 16px;
+      border-radius: 6px;
+      border: none;
+      width: 80%;
+      margin-bottom: 10px;
+    }
+    #history {
+      text-align: left;
+      max-height: 150px;
+      overflow-y: auto;
+      margin-top: 20px;
+      background: #222;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Login Screen -->
+<div id="loginScreen" class="screen active">
+  <h2>Welcome to SC Coin Spinner</h2>
+  <p>Enter your username to play:</p>
+  <input type="text" id="usernameInput" placeholder="Enter your name" />
+  <br>
+  <button class="button" onclick="login()">Start Game</button>
+</div>
+
+<!-- Home Screen -->
+<div id="home" class="screen">
+  <h1>Welcome, <span id="userNameDisplay"></span> 馃憢</h1>
+  <button class="button" onclick="startGame()">Play</button>
+</div>
+
+<!-- Game Screen -->
+<div id="game" class="screen">
+  <h2>Coins: <span id="coins">0</span></h2>
+  <div id="pointer"></div>
+  <div id="wheel"></div>
+  <button class="button" onclick="spin()">Spin (<span id="spinsLeft">5</span> left)</button>
+  <button class="button loot" onclick="openLootBox()">Open Loot Box</button>
+  <button class="button" onclick="withdraw()">馃挵 Withdraw Coins</button>
+
+  <p>Withdrawal Address:</p>
+  <input type="text" id="withdrawalAddress" placeholder="Enter UPI ID or Wallet" onblur="saveAddress()" />
+
+  <p id="dailyBonus"></p>
+
+  <div id="ad-banner">馃摙 Ad Placeholder (Insert AdSense code here)</div>
+
+  <div id="history">
+    <strong>Coin History:</strong>
+    <div id="coinHistoryList"></div>
+  </div>
+</div>
+
+<audio id="spinSound" src="https://cdn.pixabay.com/download/audio/2022/03/15/audio_8772e9f4c1.mp3?filename=spin-36036.mp3"></audio>
+
+<script>
+  const wheel = document.getElementById('wheel');
+  const coinsSpan = document.getElementById('coins');
+  const spinSound = document.getElementById('spinSound');
+  const bonusMsg = document.getElementById('dailyBonus');
+  const usernameInput = document.getElementById('usernameInput');
+  const userNameDisplay = document.getElementById('userNameDisplay');
+  const spinsLeftSpan = document.getElementById('spinsLeft');
+  const addressInput = document.getElementById('withdrawalAddress');
+  const historyList = document.getElementById('coinHistoryList');
+
+  let coins = 0;
+  let currentUser = "";
+  let spinsToday = 0;
+  const maxSpins = 5;
+
+  window.onload = function () {
+    let storedUser = localStorage.getItem('sc_user');
+    if (storedUser) {
+      currentUser = storedUser;
+      showScreen('home');
+      userNameDisplay.textContent = currentUser;
+    }
+  };
+
+  function login() {
+    let name = usernameInput.value.trim();
+    if (!name) return alert("Please enter a name!");
+    currentUser = name;
+    localStorage.setItem('sc_user', name);
+    showScreen('home');
+    userNameDisplay.textContent = currentUser;
+  }
+
+  function startGame() {
+    showScreen('game');
+    loadCoins();
+    dailyBonus();
+    loadSpins();
+    loadAddress();
+    loadHistory();
+  }
+
+  function loadCoins() {
+    let saved = localStorage.getItem('coins_' + currentUser);
+    coins = saved ? parseInt(saved) : 0;
+    coinsSpan.textContent = coins;
+  }
+
+  function saveCoins() {
+    localStorage.setItem('coins_' + currentUser, coins);
+  }
+
+  function loadSpins() {
+    const today = new Date().toDateString();
+    const storedDay = localStorage.getItem('spin_day_' + currentUser);
+    if (storedDay !== today) {
+      spinsToday = 0;
+      localStorage.setItem('spin_day_' + currentUser, today);
+      localStorage.setItem('spins_' + currentUser, 0);
+    } else {
+      spinsToday = parseInt(localStorage.getItem('spins_' + currentUser)) || 0;
+    }
+    spinsLeftSpan.textContent = maxSpins - spinsToday;
+  }
+
+  function updateSpins() {
+    spinsToday++;
+    localStorage.setItem('spins_' + currentUser, spinsToday);
+    spinsLeftSpan.textContent = maxSpins - spinsToday;
+  }
+
+  function logHistory(entry) {
+    let key = 'history_' + currentUser;
+    let history = JSON.parse(localStorage.getItem(key)) || [];
+    let timestamp = new Date().toLocaleString();
+    history.unshift(`[${timestamp}] ${entry}`);
+    localStorage.setItem(key, JSON.stringify(history));
+    loadHistory();
+  }
+
+  function loadHistory() {
+    let key = 'history_' + currentUser;
+    let history = JSON.parse(localStorage.getItem(key)) || [];
+    historyList.innerHTML = history.slice(0, 20).map(h => `<div>${h}</div>`).join('');
+  }
+
+  function spin() {
+    if (spinsToday >= maxSpins) {
+      alert("You've reached your daily spin limit!");
+      return;
+    }
+    let rewardOptions = [10, 20, 50, 100];
+    let reward = rewardOptions[Math.floor(Math.random() * rewardOptions.length)];
+    let deg = 3600 + Math.floor(Math.random() * 360);
+    wheel.style.transform = `rotate(${deg}deg)`;
+    spinSound.play();
+    setTimeout(() => {
+      coins += reward;
+      coinsSpan.textContent = coins;
+      saveCoins();
+      updateSpins();
+      logHistory(`+${reward} coins from Spin`);
+      alert("You won " + reward + " SC Coins!");
+    }, 4000);
+  }
+
+  function openLootBox() {
+    let reward = Math.floor(Math.random() * 201) + 50;
+    coins += reward;
+    coinsSpan.textContent = coins;
+    saveCoins();
+    logHistory(`+${reward} coins from Loot Box`);
+    alert("Loot Box Reward: " + reward + " SC Coins!");
+  }
+
+  function dailyBonus() {
+    let today = new Date().toDateString();
+    let bonusKey = 'bonus_' + currentUser;
+    let lastClaim = localStorage.getItem(bonusKey);
+    if (lastClaim !== today) {
+      let bonus = 100;
+      coins += bonus;
+      coinsSpan.textContent = coins;
+      localStorage.setItem(bonusKey, today);
+      saveCoins();
+      bonusMsg.textContent = "馃巵 Daily Bonus: +100 SC Coins!";
+      logHistory(`+100 coins from Daily Bonus`);
+    } else {
+      bonusMsg.textContent = "鉁� Daily Bonus Already Claimed";
+    }
+  }
+
+  function withdraw() {
+    let address = addressInput.value.trim();
+    if (!address) {
+      alert("Please enter your withdrawal address.");
+      return;
+    }
+    if (coins >= 500) {
+      logHistory(`Withdrew ${coins} coins to ${address}`);
+      alert("Withdraw request for " + coins + " SC Coins sent to:\n" + address + "\n(This is a placeholder)");
+      coins = 0;
+      coinsSpan.textContent = coins;
+      saveCoins();
+    } else {
+      alert("Minimum 500 SC Coins required to withdraw.");
+    }
+  }
+
+  function saveAddress() {
+    localStorage.setItem('address_' + currentUser, addressInput.value.trim());
+  }
+
+  function loadAddress() {
+    let address = localStorage.getItem('address_' + currentUser);
+    if (address) addressInput.value = address;
+  }
+
+  function showScreen(id) {
+    document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+    document.getElementById(id).classList.add('active');
+  }
+</script>
+
+</body>
+</html>
