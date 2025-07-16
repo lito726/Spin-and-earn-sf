@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Spin & Earn</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      background: linear-gradient(to bottom, #7ed6df, #dff9fb);
+      margin: 0;
+      padding: 0;
+      text-align: center;
+    }
+
+    .container {
+      max-width: 400px;
+      margin: 0 auto;
+      padding: 20px;
+    }
+
+    h1 {
+      font-size: 28px;
+      margin-bottom: 20px;
+    }
+
+    button {
+      background: #ff4757;
+      color: white;
+      border: none;
+      border-radius: 15px;
+      padding: 15px 30px;
+      font-size: 18px;
+      margin: 10px;
+      cursor: pointer;
+    }
+
+    #spinBtn, #lootboxBtn, #dailyBtn {
+      display: none;
+    }
+
+    #lootboxBtn {
+      background: #1e90ff;
+    }
+
+    #dailyBtn {
+      background: #2ed573;
+    }
+
+    .slot {
+      display: flex;
+      justify-content: center;
+      margin: 20px 0;
+    }
+
+    .slot div {
+      font-size: 40px;
+      width: 60px;
+      height: 60px;
+      margin: 0 10px;
+      background: white;
+      border-radius: 10px;
+      line-height: 60px;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    }
+
+    #result {
+      font-size: 18px;
+      margin-top: 20px;
+    }
+
+    .coin {
+      font-size: 20px;
+      margin-top: 10px;
+    }
+
+    #timer {
+      font-size: 14px;
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Start Game</h1>
+    <button id="startBtn">Start Game</button>
+    <button id="spinBtn">🎰 SPIN</button>
+    <button id="lootboxBtn">🎁 Open Lootbox</button>
+    <button id="dailyBtn">🗓 Daily Reward</button>
+
+    <div class="slot" id="slotMachine" style="display: none;">
+      <div id="slot1">❓</div>
+      <div id="slot2">❓</div>
+      <div id="slot3">❓</div>
+    </div>
+
+    <div id="result"></div>
+    <div class="coin">Coins: <span id="coins">0</span></div>
+    <div id="timer"></div>
+  </div>
+
+  <!-- 🔊 Sound -->
+  <audio id="spinSound">
+    <source src="https://www.soundjay.com/button/sounds/button-16.mp3" type="audio/mp3">
+  </audio>
+
+  <script>
+    const items = ["💰", "⚡", "🥶", "🐧", "💎"];
+    let coins = 0;
+
+    const startBtn = document.getElementById('startBtn');
+    const spinBtn = document.getElementById('spinBtn');
+    const lootboxBtn = document.getElementById('lootboxBtn');
+    const dailyBtn = document.getElementById('dailyBtn');
+    const slotMachine = document.getElementById('slotMachine');
+    const slot1 = document.getElementById('slot1');
+    const slot2 = document.getElementById('slot2');
+    const slot3 = document.getElementById('slot3');
+    const result = document.getElementById('result');
+    const coinsDisplay = document.getElementById('coins');
+    const spinSound = document.getElementById('spinSound');
+    const timer = document.getElementById('timer');
+
+    // Load saved coins
+    if (localStorage.getItem("sf_coins")) {
+      coins = parseInt(localStorage.getItem("sf_coins"));
+      coinsDisplay.textContent = coins;
+    }
+
+    startBtn.addEventListener('click', () => {
+      startBtn.style.display = 'none';
+      spinBtn.style.display = 'inline-block';
+      lootboxBtn.style.display = 'inline-block';
+      dailyBtn.style.display = 'inline-block';
+      slotMachine.style.display = 'flex';
+    });
+
+    spinBtn.addEventListener('click', () => {
+      spinSound.play();
+
+      const r1 = items[Math.floor(Math.random() * items.length)];
+      const r2 = items[Math.floor(Math.random() * items.length)];
+      const r3 = items[Math.floor(Math.random() * items.length)];
+
+      slot1.textContent = r1;
+      slot2.textContent = r2;
+      slot3.textContent = r3;
+
+      if (r1 === r2 && r2 === r3) {
+        result.textContent = "🎉 Jackpot! You won 500 coins!";
+        coins += 500;
+      } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+        result.textContent = "😊 Nice! You won 200 coins!";
+        coins += 200;
+      } else {
+        result.textContent = "😐 Try again!";
+      }
+
+      updateCoins();
+    });
+
+    lootboxBtn.addEventListener('click', () => {
+      const bonus = Math.floor(Math.random() * 300) + 100;
+      coins += bonus;
+      result.textContent = `🎁 Lootbox opened! You received ${bonus} coins!`;
+      updateCoins();
+    });
+
+    dailyBtn.addEventListener('click', () => {
+      const lastClaim = localStorage.getItem("lastDailyClaim");
+      const now = new Date().getTime();
+      if (!lastClaim || now - parseInt(lastClaim) > 86400000) {
+        const reward = 300;
+        coins += reward;
+        result.textContent = `🗓 You got ${reward} daily reward coins!`;
+        localStorage.setItem("lastDailyClaim", now);
+        updateCoins();
+        updateTimer();
+      } else {
+        result.textContent = "🕒 Daily reward already claimed. Try later!";
+      }
+    });
+
+    function updateCoins() {
+      coinsDisplay.textContent = coins;
+      localStorage.setItem("sf_coins", coins);
+    }
+
+    function updateTimer() {
+      const lastClaim = localStorage.getItem("lastDailyClaim");
+      if (!lastClaim) return;
+
+      const now = new Date().getTime();
+      const remaining = 86400000 - (now - parseInt(lastClaim));
+      if (remaining > 0) {
+        const hours = Math.floor(remaining / 3600000);
+        const minutes = Math.floor((remaining % 3600000) / 60000);
+        const seconds = Math.floor((remaining % 60000) / 1000);
+        timer.textContent = `⏳ Next Daily in: ${hours}h ${minutes}m ${seconds}s`;
+
+        setTimeout(updateTimer, 1000);
+      } else {
+        timer.textContent = '';
+      }
+    }
+
+    updateTimer(); // Start countdown on load
+  </script>
+</body>
+</html>
